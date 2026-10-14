@@ -28,26 +28,15 @@ builds:
 # Source archive: a tarball of the tag's source tree, suitable for
 # vendoring or offline reference. Consumers normally use `go get`, but
 # the archive is also useful for tools that prefer a snapshot.
+#
+# No `files` list: `git archive` already includes everything committed
+# to the tag. Adding a files list here would only duplicate entries and
+# fail the archive step.
 source:
   enabled: true
   name_template: "{{ .ProjectName }}-{{ .Version }}"
   format: tar.gz
   prefix_template: "{{ .ProjectName }}-{{ .Version }}/"
-  files:
-    - LICENSE
-    - README.md
-    - go.mod
-    - "*.go"
-    - "shortcodes/**/*"
-    - "gitlab/**/*"
-    - "teams/**/*"
-    - "outlook/**/*"
-    - "internal/**/*"
-    - "scripts/**/*"
-    - ".github/**/*"
-    - lefthook.yml
-    - .goreleaser.yml
-    - .golangci.yml
 
 checksum:
   name_template: "{{ .ProjectName }}_{{ .Version }}_SHA256SUMS"
