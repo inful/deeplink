@@ -89,7 +89,8 @@ formatters:
   settings:
     goimports:
       # Group our own packages under their own group.
-      local-prefixes: github.com/inful/deeplink
+      local-prefixes:
+        - github.com/inful/deeplink
 
   exclusions:
     paths:
