@@ -1,0 +1,117 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+# Cancel any in-flight run for the same ref to save CI minutes.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  # ---------------------------------------------------------------------------
+  # lint: golangci-lint on every push and PR
+  # ---------------------------------------------------------------------------
+  lint:
+    name: lint (golangci-lint)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.25"
+          cache: true
+
+      - name: golangci-lint
+        uses: golangci/golangci-lint-action@v6
+        with:
+          version: v2.1.6
+          args: --timeout 5m
+          only-new-issues: true
+
+  # ---------------------------------------------------------------------------
+  # test: race-enabled test suite on a matrix of Go versions and OSes
+  # ---------------------------------------------------------------------------
+  test:
+    name: test (${{ matrix.os }}, go ${{ matrix.go-version }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+        go-version: ["1.25", "1.26"]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: ${{ matrix.go-version }}
+          cache: true
+
+      - name: Download modules
+        run: go mod download
+
+      - name: Verify modules
+        run: go mod verify
+
+      - name: go vet
+        run: go vet ./...
+
+      - name: gofmt check
+        run: |
+          if [ "$(gofmt -l . | wc -l)" -ne 0 ]; then
+            echo "The following files are not gofmt-clean:"
+            gofmt -l .
+            exit 1
+          fi
+
+      - name: Run tests with race detector
+        run: go test -race -count=1 -coverprofile=coverage.out -covermode=atomic ./...
+
+      - name: Upload coverage to Codecov
+        if: matrix.os == 'ubuntu-latest' && matrix.go-version == '1.26'
+        uses: codecov/codecov-action@v5
+        with:
+          files: coverage.out
+          fail_ci_if_error: false
+          token: ${{ secrets.CODECOV_TOKEN }}
+
+  # ---------------------------------------------------------------------------
+  # build: ensure the module builds cleanly on every platform
+  # ---------------------------------------------------------------------------
+  build:
+    name: build (go ${{ matrix.go-version }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    strategy:
+      matrix:
+        go-version: ["1.25", "1.26"]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: ${{ matrix.go-version }}
+          cache: true
+
+      - name: Build all packages
+        run: go build ./...
+
+      - name: go mod tidy (verify)
+        run: |
+          go mod tidy
+          if [ -n "$(git status --porcelain go.mod go.sum 2>/dev/null)" ]; then
+            echo "go.mod or go.sum differs after 'go mod tidy'; please run 'go mod tidy' locally and commit."
+            git diff --stat go.mod go.sum
+            exit 1
+          fi

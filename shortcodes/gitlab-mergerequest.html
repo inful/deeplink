@@ -1,0 +1,43 @@
+{{- /*
+  Shortcode: deeplink-gitlab-mergerequest
+  Renders a link to GitLab's "new merge request" page with prefilled values.
+
+  Parameters (all named):
+    baseURL            — REQUIRED. Project URL, e.g. https://gitlab.com/g/p
+    title              — OPTIONAL. Merge request title
+    description        — OPTIONAL. Merge request body (Markdown)
+    sourceBranch       — OPTIONAL. Branch with the changes (e.g. "feature/login")
+    targetBranch       — OPTIONAL. Branch to merge into (e.g. "main")
+    removeSourceBranch — OPTIONAL. "true" to delete the source branch on merge
+    squash             — OPTIONAL. "true" to squash commits on merge
+    navSource          — OPTIONAL. Free-form navigation source label
+    text               — OPTIONAL. Link text
+    class              — OPTIONAL. CSS class
+    target             — OPTIONAL. Target attribute
+    rel                — OPTIONAL. Rel attribute
+
+  Example:
+    {{< deeplink-gitlab-mergerequest baseURL="https://gitlab.com/g/p" title="Refactor login" sourceBranch="feature/login" targetBranch="main" >}}
+
+  NOTE: This template mirrors gitlab.MergeRequest() in the Go library.
+  If you change one, change the other. URL encoding uses Hugo's
+  querify (+ for spaces); the Go library uses %20. Both are valid.
+*/ -}}
+{{- $baseURL := .Get "baseURL" -}}
+{{- if not $baseURL -}}
+  {{- errorf "deeplink-gitlab-mergerequest: baseURL is required" -}}
+{{- end -}}
+{{- $params := dict
+    "merge_request[title]" (.Get "title")
+    "merge_request[description]" (.Get "description")
+    "merge_request[source_branch]" (.Get "sourceBranch")
+    "merge_request[target_branch]" (.Get "targetBranch")
+    "merge_request[remove_source_branch]" (cond (eq (.Get "removeSourceBranch") "true") "true" "")
+    "merge_request[squash]" (cond (eq (.Get "squash") "true") "true" "")
+    "nav_source" (.Get "navSource")
+-}}
+{{- $query := querify $params -}}
+{{- $url := printf "%s/-/merge_requests/new" (strings.TrimRight "/" $baseURL) -}}
+{{- if $query -}}{{- $url = printf "%s?%s" $url $query -}}{{- end -}}
+{{- $text := or (.Get "text") (.Get "title") "Open merge request" -}}
+<a href="{{ $url }}"{{ with .Get "class" }} class="{{ . }}"{{ end }}{{ with .Get "target" }} target="{{ . }}"{{ end }}{{ with .Get "rel" }} rel="{{ . }}"{{ end }}>{{ $text }}</a>

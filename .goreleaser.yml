@@ -1,0 +1,113 @@
+# GoReleaser configuration for github.com/inful/deeplink
+#
+# This is a Go LIBRARY, not a CLI, so there is no `build` step. GoReleaser
+# is used here for:
+#   1. Producing source archives (tar.gz/zip) so consumers can vendor or
+#      inspect the release without a git clone.
+#   2. Generating a release changelog from conventional commits.
+#   3. Creating the GitHub release itself.
+#
+# Docs: https://goreleaser.com/customization/
+#
+version: 2
+
+project_name: deeplink
+
+before:
+  hooks:
+    - go mod tidy
+    - go test -short -count=1 ./...
+
+# No binaries: a library has no `main` package. The `builds` block
+# below uses `skip: true` so GoReleaser doesn't try to compile a
+# default binary from the root.
+builds:
+  - id: deeplink
+    skip: true
+
+# Source archive: a tarball of the tag's source tree, suitable for
+# vendoring or offline reference. Consumers normally use `go get`, but
+# the archive is also useful for tools that prefer a snapshot.
+source:
+  enabled: true
+  name_template: "{{ .ProjectName }}-{{ .Version }}"
+  format: tar.gz
+  prefix_template: "{{ .ProjectName }}-{{ .Version }}/"
+  files:
+    - LICENSE
+    - README.md
+    - go.mod
+    - "*.go"
+    - "shortcodes/**/*"
+    - "gitlab/**/*"
+    - "teams/**/*"
+    - "outlook/**/*"
+    - "internal/**/*"
+    - "scripts/**/*"
+    - ".github/**/*"
+    - lefthook.yml
+    - .goreleaser.yml
+    - .golangci.yml
+
+checksum:
+  name_template: "{{ .ProjectName }}_{{ .Version }}_SHA256SUMS"
+  algorithm: sha256
+
+snapshot:
+  version_template: "{{ .Version }}-next"
+
+changelog:
+  use: git
+  sort: asc
+  filters:
+    exclude:
+      - "^Merge "
+      - "^Revert "
+      - "^test:"
+      - "^chore:"
+      - "^ci:"
+  groups:
+    - title: "⚠️ Breaking changes"
+      regexp: '^(\w+)(?:\([\w\.\-]+\))?!:'
+      order: 0
+    - title: "🚀 Features"
+      regexp: '^feat(?:\([\w\.\-]+\))?:'
+      order: 1
+    - title: "🐛 Bug fixes"
+      regexp: '^fix(?:\([\w\.\-]+\))?:'
+      order: 2
+    - title: "🧰 Maintenance"
+      regexp: '^(build|chore|ci|docs|style|refactor|perf|test)(?:\([\w\.\-]+\))?:'
+      order: 3
+
+release:
+  github:
+    owner: inful
+    name: deeplink
+  draft: true            # human review before publishing
+  prerelease: auto       # v0.x.y and v0.0.0-rc.* become prereleases
+  replace_existing_artifacts: true
+  header: |
+    ## deeplink {{ .Version }}
+
+    A Go library and set of Hugo shortcodes for building deep links into
+    GitLab, Microsoft Teams, Outlook, and other systems.
+
+    See the [README](https://github.com/inful/deeplink/blob/main/README.md)
+    for usage.
+
+    Install:
+
+    ```sh
+    go get github.com/inful/deeplink@v{{ .Version }}
+    ```
+  footer: |
+    ## Verifying
+
+    The source archive is checksummed; see the `SHA256SUMS` file attached
+    to this release.
+
+    ## Issues
+
+    Found a bug or want a new system supported? Open an issue at
+    <https://github.com/inful/deeplink/issues>.

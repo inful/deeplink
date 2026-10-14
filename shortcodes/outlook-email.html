@@ -1,0 +1,42 @@
+{{- /*
+  Shortcode: deeplink-outlook-email
+  Renders a mailto: link that opens the user's default mail client with
+  a compose window pre-filled.
+
+  Parameters (all named):
+    to      — REQUIRED (comma-separated). Recipient(s). At least one
+              recipient across to/cc/bcc is required.
+    cc      — OPTIONAL. Carbon-copy recipient(s), comma-separated.
+    bcc     — OPTIONAL. Blind carbon-copy recipient(s), comma-separated.
+    subject — OPTIONAL. Email subject
+    body    — OPTIONAL. Email body (plain text; newlines preserved)
+    text    — OPTIONAL. Link text
+    class   — OPTIONAL. CSS class
+    target  — OPTIONAL. Target attribute
+    rel     — OPTIONAL. Rel attribute
+
+  Example:
+    {{< deeplink-outlook-email to="alice@example.com" subject="Sprint planning" body="Agenda: ..." >}}
+
+  NOTE: This template mirrors outlook.Email() in the Go library.
+  The to/cc/bcc parameters are kept literal (not URL-encoded) so the
+  commas survive, matching mailto: URL conventions. If you change
+  one, change the other.
+*/ -}}
+{{- $to := .Get "to" -}}
+{{- $cc := .Get "cc" -}}
+{{- $bcc := .Get "bcc" -}}
+{{- if and (not $to) (not $cc) (not $bcc) -}}
+  {{- errorf "deeplink-outlook-email: at least one recipient is required (to, cc, or bcc)" -}}
+{{- end -}}
+{{- $params := dict
+    "subject" (.Get "subject")
+    "body" (.Get "body")
+    "cc" $cc
+    "bcc" $bcc
+-}}
+{{- $query := querify $params -}}
+{{- $url := printf "mailto:%s" $to -}}
+{{- if $query -}}{{- $url = printf "%s?%s" $url $query -}}{{- end -}}
+{{- $text := or (.Get "text") (.Get "subject") "Compose email" -}}
+<a href="{{ $url }}"{{ with .Get "class" }} class="{{ . }}"{{ end }}{{ with .Get "target" }} target="{{ . }}"{{ end }}{{ with .Get "rel" }} rel="{{ . }}"{{ end }}>{{ $text }}</a>

@@ -1,0 +1,50 @@
+{{- /*
+  Shortcode: deeplink-gitlab-issue
+  Renders a link to GitLab's "new work item" page with prefilled values.
+
+  Parameters (all named):
+    baseURL     — REQUIRED. Project or group URL, e.g. https://gitlab.com/g/p
+    title       — OPTIONAL. Issue title
+    description — OPTIONAL. Issue body (Markdown)
+    issueType   — OPTIONAL. "issue" or "incident"
+    confidential — OPTIONAL. "true" to mark the issue as confidential
+    template    — OPTIONAL. Project description template name
+    descriptionTemplate — OPTIONAL. description_template parameter (GitLab 17.9+)
+    addRelatedIssue — OPTIONAL. Numeric ID of an existing issue to relate to
+    text        — OPTIONAL. Link text (defaults to the title, then to "File an issue")
+    class       — OPTIONAL. CSS class to add to the <a> tag
+    target      — OPTIONAL. Target attribute (e.g. "_blank")
+    rel         — OPTIONAL. Rel attribute (e.g. "noopener")
+
+  Example:
+    {{< deeplink-gitlab-issue baseURL="https://gitlab.com/g/p" title="Bug: login broken" description="Steps to reproduce..." >}}
+
+  NOTE on URL encoding: This shortcode uses Hugo's `querify` function,
+  which uses '+' (form encoding) for spaces. The Go library
+  (gitlab.Issue) uses '%20' for spaces, matching the format shown in
+  GitLab's documentation. Both are valid URLs and GitLab accepts either.
+  If you need byte-exact reproducibility with the Go library, call
+  gitlab.Issue() from your build pipeline and pass the resulting URL via
+  the .Site.Params or a custom shortcode.
+
+  NOTE on parallel implementation: This template intentionally mirrors
+  the logic in gitlab/issue.go. If you change one, change the other.
+*/ -}}
+{{- $baseURL := .Get "baseURL" -}}
+{{- if not $baseURL -}}
+  {{- errorf "deeplink-gitlab-issue: baseURL is required" -}}
+{{- end -}}
+{{- $params := dict
+    "issue[title]" (.Get "title")
+    "issue[description]" (.Get "description")
+    "issue[issue_type]" (.Get "issueType")
+    "issue[confidential]" (cond (eq (.Get "confidential") "true") "true" "")
+    "issuable_template" (.Get "template")
+    "description_template" (.Get "descriptionTemplate")
+    "add_related_issue" (.Get "addRelatedIssue")
+-}}
+{{- $query := querify $params -}}
+{{- $url := printf "%s/-/work_items/new" (strings.TrimRight "/" $baseURL) -}}
+{{- if $query -}}{{- $url = printf "%s?%s" $url $query -}}{{- end -}}
+{{- $text := or (.Get "text") (.Get "title") "File an issue" -}}
+<a href="{{ $url }}"{{ with .Get "class" }} class="{{ . }}"{{ end }}{{ with .Get "target" }} target="{{ . }}"{{ end }}{{ with .Get "rel" }} rel="{{ . }}"{{ end }}>{{ $text }}</a>

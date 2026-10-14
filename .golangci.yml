@@ -1,0 +1,96 @@
+# golangci-lint v2 configuration for github.com/inful/deeplink.
+#
+# Docs: https://golangci-lint.run/product/configuration/
+#
+# The default linter set is intentionally small: it catches real bugs
+# (errcheck, staticcheck, ineffassign, unused) and obvious style issues
+# (gofmt, goimports, misspell, gocritic). Add more linters per-package
+# if a specific area benefits.
+
+version: "2"
+
+run:
+  timeout: 5m
+  # Don't fail on benign issues outside our control (vendored deps, etc.)
+  tests: true
+  modules-download-mode: readonly
+
+linters:
+  # Default linters for v2 are reasonable. We enable a few more below.
+  default: standard
+  enable:
+    - errcheck        # unchecked errors
+    - errorlint       # use errors.Is/As/unwrap
+    - gocritic        # opinionated style & performance checks
+    - misspell        # English spelling in comments/strings
+    - revive          # replacement for golint
+    - staticcheck     # the canonical "would you ship this?" linter
+    - testifylint     # if/when we add testify assertions
+    - unused          # dead code
+
+  settings:
+    gocritic:
+      enabled-tags:
+        - diagnostic
+        - style
+        - performance
+      disabled-checks:
+        - dupImport             # too noisy with goimports
+        - hugeParam             # value-typed params are idiomatic for constructor functions
+        - ifElseChain           # matter of taste
+        - octalLiteral          # matter of taste
+        - paramTypeCombine      # too aggressive
+        - wrapperFunc           # false positives on small wrappers
+    revive:
+      rules:
+        - name: var-naming
+          severity: warning
+        - name: exported
+          severity: warning
+        - name: error-strings
+          severity: warning
+        - name: error-naming
+          severity: warning
+        - name: error-return
+          severity: warning
+        - name: package-comments
+          severity: warning
+        - name: indent-error-flow
+          severity: warning
+    misspell:
+      locale: US
+      ignore-rules:
+        - cancelled
+    staticcheck:
+      checks:
+        - all
+        - "-SA1019"  # allow use of deprecated APIs in tests/examples
+    errcheck:
+      check-blank: true        # assignments to _ are still checked
+      check-type-assertions: true
+
+  exclusions:
+    # Generated files and test data are exempt.
+    paths:
+      - internal/q/testdata
+    rules:
+      - path: _test\.go
+        text: "unused-parameter"        # common in table-driven tests
+      - path: funcmap_test\.go
+        text: "unused-parameter"        # ditto
+      # Allow `// Some comment` without a trailing period in short doc lines.
+      - linters: [revive]
+        text: "should be of the form"
+
+formatters:
+  enable:
+    - gofmt
+    - goimports
+  settings:
+    goimports:
+      # Group our own packages under their own group.
+      local-prefixes: github.com/inful/deeplink
+
+  exclusions:
+    paths:
+      - internal/q/testdata

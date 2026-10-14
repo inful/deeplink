@@ -1,0 +1,72 @@
+# lefthook config for github.com/inful/deeplink
+#
+# Install: `lefthook install` (run once after clone, or `mise install lefthook`
+# and re-run).
+# Docs:    https://lefthook.dev/configuration/
+
+min-version: 1.11.0
+
+source_dir: .
+
+# Treat any non-zero exit from a hook as a hard failure.
+fail_on_changes: false
+
+# =============================================================================
+# pre-commit: run before the commit is recorded.
+# =============================================================================
+pre-commit:
+  parallel: true
+  commands:
+    # Format check (fast — reformatting on commit is annoying, just block it).
+    gofmt:
+      glob: "*.go"
+      run: gofmt -l {staged_files} | (! grep .)
+      stage_fixed: true
+
+    # go vet (cheap, catches suspicious constructs early).
+    govet:
+      glob: "*.go"
+      run: go vet ./...
+
+    # Full test suite. Skipped on partial commits of unrelated files; we
+    # re-run in CI anyway. The fast feedback here is "did I break
+    # something adjacent".
+    tests:
+      glob: "*.go"
+      run: go test -race -count=1 -short ./...
+
+    # golangci-lint. This is the canonical lint check; the CI uses the
+    # same config.
+    golangci-lint:
+      glob: "*.go"
+      run: golangci-lint run --timeout 5m ./...
+      # If golangci-lint is missing locally, do not block the commit —
+      # CI will catch it.
+      skip: |
+        command -v golangci-lint >/dev/null 2>&1 || \
+        [ ! -f .golangci.yml ]
+
+# =============================================================================
+# commit-msg: validate the commit message format.
+# =============================================================================
+commit-msg:
+  parallel: false
+  commands:
+    conventional-commit:
+      run: ./scripts/check-commit-msg.sh {1}
+
+# =============================================================================
+# pre-push: full re-verification before anything leaves the machine.
+# =============================================================================
+pre-push:
+  parallel: false
+  commands:
+    full-tests:
+      run: go test -race -count=1 ./...
+    golangci-lint:
+      run: |
+        if command -v golangci-lint >/dev/null 2>&1; then
+          golangci-lint run --timeout 10m ./...
+        else
+          echo "golangci-lint not installed; skipping (CI will catch issues)"
+        fi

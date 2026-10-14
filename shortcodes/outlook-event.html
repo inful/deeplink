@@ -1,0 +1,38 @@
+{{- /*
+  Shortcode: deeplink-outlook-event
+  Renders a link that opens Outlook on the web's "compose new calendar event" page.
+
+  Parameters (all named):
+    subject   — REQUIRED. Event title
+    body      — OPTIONAL. Event description (plain text; newlines preserved)
+    location  — OPTIONAL. Event location
+    startDate — OPTIONAL. Start in a format Outlook accepts (e.g. "2024-01-15T10:00:00.000" or "2024-01-15" for all-day)
+    endDate   — OPTIONAL. End in a format Outlook accepts
+    text      — OPTIONAL. Link text
+    class     — OPTIONAL. CSS class
+    target    — OPTIONAL. Target attribute
+    rel       — OPTIONAL. Rel attribute
+
+  Example:
+    {{< deeplink-outlook-event subject="Sprint review" startDate="2024-01-15T10:00:00.000" endDate="2024-01-15T11:00:00.000" location="Teams" >}}
+
+  NOTE: This template mirrors outlook.Event() in the Go library.
+  If you change one, change the other. URL encoding uses Hugo's
+  querify (+ for spaces); the Go library uses %20. Both are valid.
+*/ -}}
+{{- $subject := .Get "subject" -}}
+{{- if not $subject -}}
+  {{- errorf "deeplink-outlook-event: subject is required" -}}
+{{- end -}}
+{{- $params := dict
+    "body" (.Get "body")
+    "enddt" (.Get "endDate")
+    "startdt" (.Get "startDate")
+    "subject" $subject
+    "location" (.Get "location")
+-}}
+{{- $query := querify $params -}}
+{{- $url := "https://outlook.office.com/calendar/deeplink/compose" -}}
+{{- if $query -}}{{- $url = printf "%s?%s" $url $query -}}{{- end -}}
+{{- $text := or (.Get "text") $subject "Add to calendar" -}}
+<a href="{{ $url }}"{{ with .Get "class" }} class="{{ . }}"{{ end }}{{ with .Get "target" }} target="{{ . }}"{{ end }}{{ with .Get "rel" }} rel="{{ . }}"{{ end }}>{{ $text }}</a>

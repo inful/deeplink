@@ -1,0 +1,40 @@
+{{- /*
+  Shortcode: deeplink-teams-channel
+  Renders a link that opens an existing Microsoft Teams channel.
+
+  Parameters (all named):
+    channelId   — REQUIRED. Channel identifier, e.g. "19:<GUID>@thread.tacv2"
+    channelName — OPTIONAL. Human-readable channel name (used in URL path)
+    groupId     — OPTIONAL. Microsoft 365 group ID
+    tenantId    — OPTIONAL. Microsoft Entra tenant ID
+    private     — OPTIONAL. "true" for a private (next-gen) channel
+    shared      — OPTIONAL. "true" for a shared (cross-tenant) channel
+    text        — OPTIONAL. Link text
+    class       — OPTIONAL. CSS class
+    target      — OPTIONAL. Target attribute
+    rel         — OPTIONAL. Rel attribute
+
+  Example:
+    {{< deeplink-teams-channel channelId="19:abc@thread.tacv2" channelName="General" groupId="..." tenantId="..." >}}
+
+  NOTE: This template mirrors teams.Channel() in the Go library.
+  ChannelId and channelName are URL-encoded using Hugo's urlize, which
+  leaves ':' and '@' unencoded. The Go library uses query-style
+  encoding that escapes these characters. Both forms are accepted by
+  Teams. If you change one, change the other.
+*/ -}}
+{{- $channelId := .Get "channelId" -}}
+{{- if not $channelId -}}
+  {{- errorf "deeplink-teams-channel: channelId is required" -}}
+{{- end -}}
+{{- $params := dict
+    "groupId" (.Get "groupId")
+    "tenantId" (.Get "tenantId")
+    "ngc" (cond (eq (.Get "private") "true") "true" "")
+    "allowXTenantAccess" (cond (eq (.Get "shared") "true") "true" "")
+-}}
+{{- $query := querify $params -}}
+{{- $url := printf "https://teams.microsoft.com/l/channel/%s/%s" ($channelId | urlize) ((.Get "channelName") | urlize) -}}
+{{- if $query -}}{{- $url = printf "%s?%s" $url $query -}}{{- end -}}
+{{- $text := or (.Get "text") (.Get "channelName") "Open channel" -}}
+<a href="{{ $url }}"{{ with .Get "class" }} class="{{ . }}"{{ end }}{{ with .Get "target" }} target="{{ . }}"{{ end }}{{ with .Get "rel" }} rel="{{ . }}"{{ end }}>{{ $text }}</a>

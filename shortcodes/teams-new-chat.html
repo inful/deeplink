@@ -1,0 +1,40 @@
+{{- /*
+  Shortcode: deeplink-teams-new-chat
+  Renders a link that opens Microsoft Teams to a "new chat" compose window.
+
+  Parameters (all named):
+    tenantId  — OPTIONAL. Microsoft Entra tenant ID
+    users     — REQUIRED (comma-separated string, or pass via .Site.Params as a list).
+                Each entry is a UPN (email) or bot ID prefixed with "28:".
+                At least one user is required.
+    topicName — OPTIONAL. Chat display name (only meaningful for 3+ users)
+    message   — OPTIONAL. Prepopulated message text
+    text      — OPTIONAL. Link text
+    class     — OPTIONAL. CSS class
+    target    — OPTIONAL. Target attribute
+    rel       — OPTIONAL. Rel attribute
+
+  Example:
+    {{< deeplink-teams-new-chat users="alice@contoso.com,bob@contoso.com" message="Quick question" >}}
+
+  NOTE: This template mirrors teams.NewChat() in the Go library.
+  The 'users' parameter is a comma-separated list kept literal in the
+  URL (matching the Microsoft documentation); Hugo's querify would
+  re-encode the commas, so this shortcode builds the users value
+  directly. If you change one, change the other.
+*/ -}}
+{{- $users := .Get "users" -}}
+{{- if not $users -}}
+  {{- errorf "deeplink-teams-new-chat: users is required" -}}
+{{- end -}}
+{{- $params := dict
+    "tenantId" (.Get "tenantId")
+    "users" $users
+    "topicName" (.Get "topicName")
+    "message" (.Get "message")
+-}}
+{{- $query := querify $params -}}
+{{- $url := "https://teams.microsoft.com/l/chat/0/0" -}}
+{{- if $query -}}{{- $url = printf "%s?%s" $url $query -}}{{- end -}}
+{{- $text := or (.Get "text") "Open in Teams" -}}
+<a href="{{ $url }}"{{ with .Get "class" }} class="{{ . }}"{{ end }}{{ with .Get "target" }} target="{{ . }}"{{ end }}{{ with .Get "rel" }} rel="{{ . }}"{{ end }}>{{ $text }}</a>
