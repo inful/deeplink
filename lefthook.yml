@@ -1,72 +1,16 @@
-# lefthook config for github.com/inful/deeplink
+# yaml-language-server: $schema=https://lefthook.dev/schema.json
 #
-# Install: `lefthook install` (run once after clone, or `mise install lefthook`
-# and re-run).
-# Docs:    https://lefthook.dev/configuration/
+# Imports the shared lefthook configuration from github.com/inful/lefthooks.
+# Pin `ref` to a tag for reproducible builds.
+#
+# Hook behavior is defined in https://github.com/inful/lefthooks and
+# self-gates per-consumer via glob/skip conditions — no per-repo overrides
+# needed for the standard Go / Markdown / sqlc checks.
 
-min-version: 1.11.0
+min_version: 2.1.0
 
-source_dir: .
-
-# Treat any non-zero exit from a hook as a hard failure.
-fail_on_changes: false
-
-# =============================================================================
-# pre-commit: run before the commit is recorded.
-# =============================================================================
-pre-commit:
-  parallel: true
-  commands:
-    # Format check (fast — reformatting on commit is annoying, just block it).
-    gofmt:
-      glob: "*.go"
-      run: gofmt -l {staged_files} | (! grep .)
-      stage_fixed: true
-
-    # go vet (cheap, catches suspicious constructs early).
-    govet:
-      glob: "*.go"
-      run: go vet ./...
-
-    # Full test suite. Skipped on partial commits of unrelated files; we
-    # re-run in CI anyway. The fast feedback here is "did I break
-    # something adjacent".
-    tests:
-      glob: "*.go"
-      run: go test -race -count=1 -short ./...
-
-    # golangci-lint. This is the canonical lint check; the CI uses the
-    # same config.
-    golangci-lint:
-      glob: "*.go"
-      run: golangci-lint run --timeout 5m ./...
-      # If golangci-lint is missing locally, do not block the commit —
-      # CI will catch it.
-      skip: |
-        command -v golangci-lint >/dev/null 2>&1 || \
-        [ ! -f .golangci.yml ]
-
-# =============================================================================
-# commit-msg: validate the commit message format.
-# =============================================================================
-commit-msg:
-  parallel: false
-  commands:
-    conventional-commit:
-      run: ./scripts/check-commit-msg.sh {1}
-
-# =============================================================================
-# pre-push: full re-verification before anything leaves the machine.
-# =============================================================================
-pre-push:
-  parallel: false
-  commands:
-    full-tests:
-      run: go test -race -count=1 ./...
-    golangci-lint:
-      run: |
-        if command -v golangci-lint >/dev/null 2>&1; then
-          golangci-lint run --timeout 10m ./...
-        else
-          echo "golangci-lint not installed; skipping (CI will catch issues)"
-        fi
+remotes:
+  - git_url: git@github.com:inful/lefthooks.git
+    ref: v0.1.1
+    configs:
+      - lefthook.yml
