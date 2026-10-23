@@ -4,8 +4,7 @@
   a compose window pre-filled.
 
   Parameters (all named):
-    to      — REQUIRED (comma-separated). Recipient(s). At least one
-              recipient across to/cc/bcc is required.
+    to      — REQUIRED. Recipient(s), comma-separated.
     cc      — OPTIONAL. Carbon-copy recipient(s), comma-separated.
     bcc     — OPTIONAL. Blind carbon-copy recipient(s), comma-separated.
     subject — OPTIONAL. Email subject
@@ -18,10 +17,13 @@
   Example:
     {{< deeplink-outlook-email to="alice@example.com" subject="Sprint planning" body="Agenda: ..." >}}
 
-  NOTE: This template mirrors outlook.Email() in the Go library.
-  The to/cc/bcc parameters are kept literal (not URL-encoded) so the
-  commas survive, matching mailto: URL conventions. If you change
-  one, change the other.
+  NOTE: This template mirrors outlook.Email() in the Go library and
+  produces the same URL. The to/cc/bcc values are written literally,
+  because mailto: URLs carry their recipients as a comma-separated list
+  rather than an encoded one. They are still rejected if they contain
+  '&', '?', '#' or whitespace, because such a value could add
+  parameters of its own — the same rule the Go library enforces.
+  If you change one, change the other.
 */ -}}
 {{- $to := .Get "to" -}}
 {{- $cc := .Get "cc" -}}
@@ -29,13 +31,23 @@
 {{- if and (not $to) (not $cc) (not $bcc) -}}
   {{- errorf "deeplink-outlook-email: at least one recipient is required (to, cc, or bcc)" -}}
 {{- end -}}
-{{- $params := dict
-    "subject" (.Get "subject")
-    "body" (.Get "body")
-    "cc" $cc
-    "bcc" $bcc
--}}
-{{- $query := querify $params -}}
+{{- if findRE "[&?#[:space:]]" (printf "%s,%s,%s" $to $cc $bcc) -}}
+  {{- errorf "deeplink-outlook-email: recipients must not contain '&', '?', '#' or whitespace" -}}
+{{- end -}}
+{{- $pairs := slice -}}
+{{- with .Get "subject" -}}
+  {{- $pairs = $pairs | append (printf "subject=%s" (replace (urlquery .) "+" "%20")) -}}
+{{- end -}}
+{{- with .Get "body" -}}
+  {{- $pairs = $pairs | append (printf "body=%s" (replace (urlquery .) "+" "%20")) -}}
+{{- end -}}
+{{- with $cc -}}
+  {{- $pairs = $pairs | append (printf "cc=%s" .) -}}
+{{- end -}}
+{{- with $bcc -}}
+  {{- $pairs = $pairs | append (printf "bcc=%s" .) -}}
+{{- end -}}
+{{- $query := delimit $pairs "&" -}}
 {{- $url := printf "mailto:%s" $to -}}
 {{- if $query -}}{{- $url = printf "%s?%s" $url $query -}}{{- end -}}
 {{- $text := or (.Get "text") (.Get "subject") "Compose email" -}}

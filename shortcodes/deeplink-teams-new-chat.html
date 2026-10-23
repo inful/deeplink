@@ -1,0 +1,49 @@
+{{- /*
+  Shortcode: deeplink-teams-new-chat
+  Renders a link that opens Microsoft Teams to a "new chat" compose window.
+
+  Parameters (all named):
+    tenantId  — OPTIONAL. Microsoft Entra tenant ID
+    users     — REQUIRED. Comma-separated list of participants. Each entry
+                is a UPN (email) or a bot ID prefixed with "28:".
+    topicName — OPTIONAL. Chat display name (only meaningful for 3+ users)
+    message   — OPTIONAL. Prepopulated message text
+    text      — OPTIONAL. Link text
+    class     — OPTIONAL. CSS class
+    target    — OPTIONAL. Target attribute
+    rel       — OPTIONAL. Rel attribute
+
+  Example:
+    {{< deeplink-teams-new-chat users="alice@contoso.com,bob@contoso.com" message="Quick question" >}}
+
+  NOTE: This template mirrors teams.NewChat() in the Go library and
+  produces the same URL. The `users` value is written literally, because
+  Microsoft documents it as a comma-separated list rather than a
+  %2C-encoded one, so it is not passed through `urlquery`. It is still
+  rejected if it contains '&', '?', '#' or whitespace, because such a
+  value could add parameters of its own — the same rule the Go library
+  enforces. If you change one, change the other.
+*/ -}}
+{{- $users := .Get "users" -}}
+{{- if not $users -}}
+  {{- errorf "deeplink-teams-new-chat: users is required" -}}
+{{- end -}}
+{{- if findRE "[&?#[:space:]]" $users -}}
+  {{- errorf "deeplink-teams-new-chat: users must not contain '&', '?', '#' or whitespace" -}}
+{{- end -}}
+{{- $pairs := slice -}}
+{{- with .Get "tenantId" -}}
+  {{- $pairs = $pairs | append (printf "tenantId=%s" (replace (urlquery .) "+" "%20")) -}}
+{{- end -}}
+{{- $pairs = $pairs | append (printf "users=%s" $users) -}}
+{{- with .Get "topicName" -}}
+  {{- $pairs = $pairs | append (printf "topicName=%s" (replace (urlquery .) "+" "%20")) -}}
+{{- end -}}
+{{- with .Get "message" -}}
+  {{- $pairs = $pairs | append (printf "message=%s" (replace (urlquery .) "+" "%20")) -}}
+{{- end -}}
+{{- $query := delimit $pairs "&" -}}
+{{- $url := "https://teams.microsoft.com/l/chat/0/0" -}}
+{{- if $query -}}{{- $url = printf "%s?%s" $url $query -}}{{- end -}}
+{{- $text := or (.Get "text") "Open in Teams" -}}
+<a href="{{ $url }}"{{ with .Get "class" }} class="{{ . }}"{{ end }}{{ with .Get "target" }} target="{{ . }}"{{ end }}{{ with .Get "rel" }} rel="{{ . }}"{{ end }}>{{ $text }}</a>

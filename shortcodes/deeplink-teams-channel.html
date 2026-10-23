@@ -17,24 +17,35 @@
   Example:
     {{< deeplink-teams-channel channelId="19:abc@thread.tacv2" channelName="General" groupId="..." tenantId="..." >}}
 
-  NOTE: This template mirrors teams.Channel() in the Go library.
-  ChannelId and channelName are URL-encoded using Hugo's urlize, which
-  leaves ':' and '@' unencoded. The Go library uses query-style
-  encoding that escapes these characters. Both forms are accepted by
-  Teams. If you change one, change the other.
+  NOTE: This template mirrors teams.Channel() in the Go library and
+  produces the same URL. The path segments use
+  `replace (urlquery .) "+" "%20"` — NOT Hugo's `urlize`, which would
+  lowercase the channel name and turn spaces into hyphens. If you change
+  one, change the other.
 */ -}}
-{{- $channelId := .Get "channelId" -}}
-{{- if not $channelId -}}
+{{- $channelID := .Get "channelId" -}}
+{{- if not $channelID -}}
   {{- errorf "deeplink-teams-channel: channelId is required" -}}
 {{- end -}}
-{{- $params := dict
-    "groupId" (.Get "groupId")
-    "tenantId" (.Get "tenantId")
-    "ngc" (cond (eq (.Get "private") "true") "true" "")
-    "allowXTenantAccess" (cond (eq (.Get "shared") "true") "true" "")
--}}
-{{- $query := querify $params -}}
-{{- $url := printf "https://teams.microsoft.com/l/channel/%s/%s" ($channelId | urlize) ((.Get "channelName") | urlize) -}}
+{{- $path := printf "https://teams.microsoft.com/l/channel/%s" (replace (urlquery $channelID) "+" "%20") -}}
+{{- with .Get "channelName" -}}
+  {{- $path = printf "%s/%s" $path (replace (urlquery .) "+" "%20") -}}
+{{- end -}}
+{{- $pairs := slice -}}
+{{- with .Get "groupId" -}}
+  {{- $pairs = $pairs | append (printf "groupId=%s" (replace (urlquery .) "+" "%20")) -}}
+{{- end -}}
+{{- with .Get "tenantId" -}}
+  {{- $pairs = $pairs | append (printf "tenantId=%s" (replace (urlquery .) "+" "%20")) -}}
+{{- end -}}
+{{- if eq (.Get "private") "true" -}}
+  {{- $pairs = $pairs | append "ngc=true" -}}
+{{- end -}}
+{{- if eq (.Get "shared") "true" -}}
+  {{- $pairs = $pairs | append "allowXTenantAccess=true" -}}
+{{- end -}}
+{{- $query := delimit $pairs "&" -}}
+{{- $url := $path -}}
 {{- if $query -}}{{- $url = printf "%s?%s" $url $query -}}{{- end -}}
 {{- $text := or (.Get "text") (.Get "channelName") "Open channel" -}}
 <a href="{{ $url }}"{{ with .Get "class" }} class="{{ . }}"{{ end }}{{ with .Get "target" }} target="{{ . }}"{{ end }}{{ with .Get "rel" }} rel="{{ . }}"{{ end }}>{{ $text }}</a>

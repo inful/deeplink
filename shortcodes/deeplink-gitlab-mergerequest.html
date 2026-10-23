@@ -19,24 +19,38 @@
   Example:
     {{< deeplink-gitlab-mergerequest baseURL="https://gitlab.com/g/p" title="Refactor login" sourceBranch="feature/login" targetBranch="main" >}}
 
-  NOTE: This template mirrors gitlab.MergeRequest() in the Go library.
-  If you change one, change the other. URL encoding uses Hugo's
-  querify (+ for spaces); the Go library uses %20. Both are valid.
+  NOTE: This template mirrors gitlab.MergeRequest() in the Go library and
+  produces the same URL. The `merge_request[...]` keys are written
+  literally, and values use `replace (urlquery .) "+" "%20"` so spaces
+  become %20. If you change one, change the other.
 */ -}}
 {{- $baseURL := .Get "baseURL" -}}
 {{- if not $baseURL -}}
   {{- errorf "deeplink-gitlab-mergerequest: baseURL is required" -}}
 {{- end -}}
-{{- $params := dict
-    "merge_request[title]" (.Get "title")
-    "merge_request[description]" (.Get "description")
-    "merge_request[source_branch]" (.Get "sourceBranch")
-    "merge_request[target_branch]" (.Get "targetBranch")
-    "merge_request[remove_source_branch]" (cond (eq (.Get "removeSourceBranch") "true") "true" "")
-    "merge_request[squash]" (cond (eq (.Get "squash") "true") "true" "")
-    "nav_source" (.Get "navSource")
--}}
-{{- $query := querify $params -}}
+{{- $pairs := slice -}}
+{{- with .Get "title" -}}
+  {{- $pairs = $pairs | append (printf "merge_request[title]=%s" (replace (urlquery .) "+" "%20")) -}}
+{{- end -}}
+{{- with .Get "description" -}}
+  {{- $pairs = $pairs | append (printf "merge_request[description]=%s" (replace (urlquery .) "+" "%20")) -}}
+{{- end -}}
+{{- with .Get "sourceBranch" -}}
+  {{- $pairs = $pairs | append (printf "merge_request[source_branch]=%s" (replace (urlquery .) "+" "%20")) -}}
+{{- end -}}
+{{- with .Get "targetBranch" -}}
+  {{- $pairs = $pairs | append (printf "merge_request[target_branch]=%s" (replace (urlquery .) "+" "%20")) -}}
+{{- end -}}
+{{- if eq (.Get "removeSourceBranch") "true" -}}
+  {{- $pairs = $pairs | append "merge_request[remove_source_branch]=true" -}}
+{{- end -}}
+{{- if eq (.Get "squash") "true" -}}
+  {{- $pairs = $pairs | append "merge_request[squash]=true" -}}
+{{- end -}}
+{{- with .Get "navSource" -}}
+  {{- $pairs = $pairs | append (printf "nav_source=%s" (replace (urlquery .) "+" "%20")) -}}
+{{- end -}}
+{{- $query := delimit $pairs "&" -}}
 {{- $url := printf "%s/-/merge_requests/new" (strings.TrimRight "/" $baseURL) -}}
 {{- if $query -}}{{- $url = printf "%s?%s" $url $query -}}{{- end -}}
 {{- $text := or (.Get "text") (.Get "title") "Open merge request" -}}

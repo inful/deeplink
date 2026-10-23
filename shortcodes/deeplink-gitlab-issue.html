@@ -19,31 +19,46 @@
   Example:
     {{< deeplink-gitlab-issue baseURL="https://gitlab.com/g/p" title="Bug: login broken" description="Steps to reproduce..." >}}
 
-  NOTE on URL encoding: This shortcode uses Hugo's `querify` function,
-  which uses '+' (form encoding) for spaces. The Go library
-  (gitlab.Issue) uses '%20' for spaces, matching the format shown in
-  GitLab's documentation. Both are valid URLs and GitLab accepts either.
-  If you need byte-exact reproducibility with the Go library, call
-  gitlab.Issue() from your build pipeline and pass the resulting URL via
-  the .Site.Params or a custom shortcode.
+  NOTE: This template mirrors gitlab.Issue() in the Go library and
+  produces the same URL. Two details matter:
 
-  NOTE on parallel implementation: This template intentionally mirrors
-  the logic in gitlab/issue.go. If you change one, change the other.
+    - The `issue[...]` keys are written literally, because GitLab expects
+      `issue[title]`, not `issue%5Btitle%5D`.
+    - Values are encoded with `replace (urlquery .) "+" "%20"`, which is
+      Hugo's `urlquery` (identical to Go's url.QueryEscape) with spaces
+      written as %20 rather than +, matching the format GitLab documents.
+
+  If you change one, change the other.
 */ -}}
 {{- $baseURL := .Get "baseURL" -}}
 {{- if not $baseURL -}}
   {{- errorf "deeplink-gitlab-issue: baseURL is required" -}}
 {{- end -}}
-{{- $params := dict
-    "issue[title]" (.Get "title")
-    "issue[description]" (.Get "description")
-    "issue[issue_type]" (.Get "issueType")
-    "issue[confidential]" (cond (eq (.Get "confidential") "true") "true" "")
-    "issuable_template" (.Get "template")
-    "description_template" (.Get "descriptionTemplate")
-    "add_related_issue" (.Get "addRelatedIssue")
--}}
-{{- $query := querify $params -}}
+{{- $pairs := slice -}}
+{{- with .Get "title" -}}
+  {{- $pairs = $pairs | append (printf "issue[title]=%s" (replace (urlquery .) "+" "%20")) -}}
+{{- end -}}
+{{- with .Get "description" -}}
+  {{- $pairs = $pairs | append (printf "issue[description]=%s" (replace (urlquery .) "+" "%20")) -}}
+{{- end -}}
+{{- with .Get "issueType" -}}
+  {{- $pairs = $pairs | append (printf "issue[issue_type]=%s" (replace (urlquery .) "+" "%20")) -}}
+{{- end -}}
+{{- if eq (.Get "confidential") "true" -}}
+  {{- $pairs = $pairs | append "issue[confidential]=true" -}}
+{{- end -}}
+{{- with .Get "template" -}}
+  {{- $pairs = $pairs | append (printf "issuable_template=%s" (replace (urlquery .) "+" "%20")) -}}
+{{- end -}}
+{{- with .Get "descriptionTemplate" -}}
+  {{- $pairs = $pairs | append (printf "description_template=%s" (replace (urlquery .) "+" "%20")) -}}
+{{- end -}}
+{{- with .Get "addRelatedIssue" -}}
+  {{- if gt (int .) 0 -}}
+    {{- $pairs = $pairs | append (printf "add_related_issue=%s" (replace (urlquery .) "+" "%20")) -}}
+  {{- end -}}
+{{- end -}}
+{{- $query := delimit $pairs "&" -}}
 {{- $url := printf "%s/-/work_items/new" (strings.TrimRight "/" $baseURL) -}}
 {{- if $query -}}{{- $url = printf "%s?%s" $url $query -}}{{- end -}}
 {{- $text := or (.Get "text") (.Get "title") "File an issue" -}}

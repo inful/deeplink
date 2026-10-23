@@ -16,22 +16,33 @@
   Example:
     {{< deeplink-outlook-event subject="Sprint review" startDate="2024-01-15T10:00:00.000" endDate="2024-01-15T11:00:00.000" location="Teams" >}}
 
-  NOTE: This template mirrors outlook.Event() in the Go library.
-  If you change one, change the other. URL encoding uses Hugo's
-  querify (+ for spaces); the Go library uses %20. Both are valid.
+  NOTE: This template mirrors outlook.Event() in the Go library and
+  produces the same URL. Values use
+  `replace (urlquery .) "+" "%20"` so spaces become %20, matching the
+  format Microsoft's own examples use. If you change one, change the
+  other.
 */ -}}
 {{- $subject := .Get "subject" -}}
 {{- if not $subject -}}
   {{- errorf "deeplink-outlook-event: subject is required" -}}
 {{- end -}}
-{{- $params := dict
-    "body" (.Get "body")
-    "enddt" (.Get "endDate")
-    "startdt" (.Get "startDate")
-    "subject" $subject
-    "location" (.Get "location")
--}}
-{{- $query := querify $params -}}
+{{- $pairs := slice -}}
+{{- with .Get "body" -}}
+  {{- $pairs = $pairs | append (printf "body=%s" (replace (urlquery .) "+" "%20")) -}}
+{{- end -}}
+{{- with .Get "endDate" -}}
+  {{- $pairs = $pairs | append (printf "enddt=%s" (replace (urlquery .) "+" "%20")) -}}
+{{- end -}}
+{{- with .Get "startDate" -}}
+  {{- $pairs = $pairs | append (printf "startdt=%s" (replace (urlquery .) "+" "%20")) -}}
+{{- end -}}
+{{- with .Get "subject" -}}
+  {{- $pairs = $pairs | append (printf "subject=%s" (replace (urlquery .) "+" "%20")) -}}
+{{- end -}}
+{{- with .Get "location" -}}
+  {{- $pairs = $pairs | append (printf "location=%s" (replace (urlquery .) "+" "%20")) -}}
+{{- end -}}
+{{- $query := delimit $pairs "&" -}}
 {{- $url := "https://outlook.office.com/calendar/deeplink/compose" -}}
 {{- if $query -}}{{- $url = printf "%s?%s" $url $query -}}{{- end -}}
 {{- $text := or (.Get "text") $subject "Add to calendar" -}}
