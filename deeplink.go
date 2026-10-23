@@ -15,7 +15,7 @@
 package deeplink
 
 import (
-	"maps"
+	"fmt"
 	"text/template"
 
 	"github.com/inful/deeplink/gitlab"
@@ -24,18 +24,32 @@ import (
 )
 
 // Funcmap combines the FuncMap from every registered sub-package into a
-// single template.FuncMap. Sub-package keys never collide (each is
-// namespaced by its system, e.g. "gitlabIssue", "teamsNewChat",
-// "outlookEvent"); if they ever do, the last writer wins and the
-// top-level TestNoFuncNameCollisions test fails.
+// single template.FuncMap.
+//
+// It panics if two sub-packages claim the same function name. Each name
+// is namespaced by its system (e.g. "gitlabIssue", "teamsNewChat",
+// "outlookEvent"), so a collision means two sub-packages were written
+// against the same prefix — a bug in this library that would otherwise
+// silently shadow one function with another.
 func Funcmap() template.FuncMap {
-	out := template.FuncMap{}
-	for _, src := range []template.FuncMap{
+	return merge(
 		gitlab.FuncMap(),
 		teams.FuncMap(),
 		outlook.FuncMap(),
-	} {
-		maps.Copy(out, src)
+	)
+}
+
+// merge combines template FuncMaps into one, panicking if a name is
+// declared by more than one source.
+func merge(sources ...template.FuncMap) template.FuncMap {
+	out := template.FuncMap{}
+	for _, src := range sources {
+		for name, fn := range src {
+			if _, exists := out[name]; exists {
+				panic(fmt.Sprintf("deeplink: duplicate template function %q", name))
+			}
+			out[name] = fn
+		}
 	}
 	return out
 }

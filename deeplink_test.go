@@ -6,46 +6,56 @@ import (
 	"strings"
 	"testing"
 	"text/template"
-
-	"github.com/inful/deeplink/gitlab"
-	"github.com/inful/deeplink/outlook"
-	"github.com/inful/deeplink/teams"
 )
 
-func TestFuncmapCombinesAllSubPackages(t *testing.T) {
-	combined := Funcmap()
-
-	want := map[string]bool{}
-	for _, src := range []map[string]any{
-		gitlab.FuncMap(),
-		teams.FuncMap(),
-		outlook.FuncMap(),
-	} {
-		for k := range src {
-			want[k] = true
-		}
+func TestFuncmapExposesExactlyTheExpectedFunctions(t *testing.T) {
+	// This is the library's public template API. Pinning the exact set
+	// means adding, renaming, or removing a function has to be a
+	// deliberate change to this list.
+	want := []string{
+		"gitlabIssue",
+		"gitlabMergeRequest",
+		"teamsNewChat",
+		"teamsChannel",
+		"outlookEvent",
+		"outlookEmail",
 	}
 
-	for name := range want {
-		if _, ok := combined[name]; !ok {
-			t.Errorf("Funcmap() missing %q from sub-package", name)
+	got := Funcmap()
+	for _, name := range want {
+		fn, ok := got[name]
+		if !ok {
+			t.Errorf("Funcmap() missing %q", name)
+			continue
 		}
-	}
-}
-
-func TestNoFuncNameCollisions(t *testing.T) {
-	combined := Funcmap()
-	seen := make(map[string]string, len(combined))
-	for name, fn := range combined {
-		// every value must be a function (template.FuncMap constraint)
 		if fn == nil {
 			t.Errorf("Funcmap() entry %q is nil", name)
 		}
-		if prev, ok := seen[name]; ok {
-			t.Errorf("Funcmap() name %q declared by both %s and another source", name, prev)
-		}
-		seen[name] = name
 	}
+	if len(got) != len(want) {
+		t.Errorf("Funcmap() has %d functions, want %d (update the want list if the API changed)", len(got), len(want))
+	}
+}
+
+func TestMergePanicsOnDuplicateName(t *testing.T) {
+	defer func() {
+		r := recover()
+		if r == nil {
+			t.Fatal("merge() did not panic on a duplicate function name")
+		}
+		msg, ok := r.(string)
+		if !ok {
+			t.Fatalf("panic value is %T, want string", r)
+		}
+		if !strings.Contains(msg, "duplicate") || !strings.Contains(msg, "dupName") {
+			t.Errorf("panic message %q should name the duplicated function", msg)
+		}
+	}()
+
+	merge(
+		template.FuncMap{"dupName": func() {}},
+		template.FuncMap{"dupName": func() {}},
+	)
 }
 
 // TestFuncmapEndToEnd exercises the full top-level Funcmap() the way a
