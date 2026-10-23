@@ -10,6 +10,7 @@ package outlook
 
 import (
 	"errors"
+	"fmt"
 	"strings"
 
 	"github.com/inful/deeplink/internal/q"
@@ -69,7 +70,10 @@ func Event(p EventParams) (string, error) {
 		{Key: "subject", Value: p.Subject},
 		{Key: "location", Value: p.Location},
 	}
-	qs := q.Encode(pairs)
+	qs, err := q.Encode(pairs)
+	if err != nil {
+		return "", fmt.Errorf("outlook.Event: %w", err)
+	}
 	if qs == "" {
 		return base, nil
 	}

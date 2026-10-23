@@ -117,6 +117,15 @@ func TestIssue(t *testing.T) {
 			},
 			wantErr: true,
 		},
+		{
+			name: "unknown issue type is an error",
+			params: IssueParams{
+				BaseURL:   "https://gitlab.com/g/p",
+				Title:     "Foo",
+				IssueType: IssueType("bogus"),
+			},
+			wantErr: true,
+		},
 	}
 
 	for _, tt := range tests {

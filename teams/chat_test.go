@@ -69,6 +69,13 @@ func TestNewChat(t *testing.T) {
 			params:  ChatParams{Users: nil},
 			wantErr: true,
 		},
+		{
+			name: "empty entries are dropped, the rest are kept",
+			params: ChatParams{
+				Users: []string{"", "  a@x.com  ", "", "b@x.com"},
+			},
+			want: "https://teams.microsoft.com/l/chat/0/0?users=a@x.com,b@x.com",
+		},
 	}
 
 	for _, tt := range tests {
@@ -82,6 +89,41 @@ func TestNewChat(t *testing.T) {
 			}
 			if got != tt.want {
 				t.Errorf("NewChat() =\n  %q\nwant:\n  %q", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestNewChatRejectsUsersThatCouldEscapeTheirField(t *testing.T) {
+	// The `users` parameter is written literally so its commas survive.
+	// A value containing '&', '?', '#' or whitespace would let it add
+	// parameters of its own.
+	tests := []struct {
+		name  string
+		users []string
+	}{
+		{
+			name:  "ampersand injects another parameter",
+			users: []string{"a@x.com&tenantId=EVIL-TENANT"},
+		},
+		{
+			name:  "question mark starts a new query string",
+			users: []string{"a@x.com?message=hijacked"},
+		},
+		{
+			name:  "CRLF injects a header",
+			users: []string{"a@x.com\r\nX: y"},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := NewChat(ChatParams{Users: tt.users})
+			if err == nil {
+				t.Fatalf("NewChat() accepted an unsafe user, got %q", got)
+			}
+			if got != "" {
+				t.Errorf("NewChat() returned %q alongside an error, want empty", got)
 			}
 		})
 	}

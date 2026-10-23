@@ -2,6 +2,7 @@ package outlook
 
 import (
 	"errors"
+	"fmt"
 	"strings"
 
 	"github.com/inful/deeplink/internal/q"
@@ -48,7 +49,10 @@ type EmailParams struct {
 //	})
 //	// mailto:alice@example.com?body=Agenda%3A%20...&subject=Sprint%20planning
 func Email(p EmailParams) (string, error) {
-	to := joinNonEmpty(p.To)
+	to, err := q.RawSafe(joinNonEmpty(p.To))
+	if err != nil {
+		return "", fmt.Errorf("outlook.Email: To: %w", err)
+	}
 	cc := joinNonEmpty(p.CC)
 	bcc := joinNonEmpty(p.BCC)
 	if to == "" && cc == "" && bcc == "" {
@@ -58,25 +62,29 @@ func Email(p EmailParams) (string, error) {
 	base := "mailto:" + to
 	// The cc/bcc parameters, like the `to` field, are comma-separated
 	// lists of addresses; suppress encoding so the commas survive.
+	// q.Encode still rejects values that could escape their field.
 	pairs := []q.Pair{
 		{Key: "subject", Value: p.Subject},
 		{Key: "body", Value: p.Body},
 		{Key: "cc", Value: cc, Raw: true},
 		{Key: "bcc", Value: bcc, Raw: true},
 	}
-	qs := q.Encode(pairs)
+	qs, err := q.Encode(pairs)
+	if err != nil {
+		return "", fmt.Errorf("outlook.Email: %w", err)
+	}
 	if qs == "" {
 		return base, nil
 	}
 	return base + "?" + qs, nil
 }
 
-// joinNonEmpty joins non-empty strings with commas.
+// joinNonEmpty joins the trimmed, non-empty entries of parts with commas.
 func joinNonEmpty(parts []string) string {
 	out := make([]string, 0, len(parts))
 	for _, p := range parts {
-		if strings.TrimSpace(p) != "" {
-			out = append(out, p)
+		if trimmed := strings.TrimSpace(p); trimmed != "" {
+			out = append(out, trimmed)
 		}
 	}
 	return strings.Join(out, ",")

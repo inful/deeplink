@@ -5,6 +5,7 @@
 package q
 
 import (
+	"fmt"
 	"net/url"
 	"strings"
 )
@@ -24,6 +25,10 @@ type Pair struct {
 	// parameter, which the documentation shows as a comma-separated list
 	// rather than a single comma-encoded value). The Key is still
 	// encoded; only the Value is preserved literally.
+	//
+	// Raw values are validated by Encode: a value containing a character
+	// that would let it escape its own field is rejected rather than
+	// written out. See RawSafe.
 	Raw bool
 }
 
@@ -39,30 +44,55 @@ type Pair struct {
 // Pairs with an empty Value are omitted entirely. Callers that need to
 // distinguish "not set" from "set to empty" should not rely on this
 // function.
-func Encode(pairs []Pair) string {
-	if len(pairs) == 0 {
-		return ""
-	}
-
+//
+// Encode returns an error if a Raw pair holds a value that could not be
+// written without encoding (see RawSafe).
+func Encode(pairs []Pair) (string, error) {
 	first := true
 	var b strings.Builder
 	for _, p := range pairs {
 		if p.Value == "" {
 			continue
 		}
+
+		var value string
+		if p.Raw {
+			safe, err := RawSafe(p.Value)
+			if err != nil {
+				return "", fmt.Errorf("%s: %w", p.Key, err)
+			}
+			value = safe
+		} else {
+			value = encodeValue(p.Value)
+		}
+
 		if !first {
 			b.WriteByte('&')
 		}
 		first = false
 		b.WriteString(encodeKey(p.Key))
 		b.WriteByte('=')
-		if p.Raw {
-			b.WriteString(p.Value)
-		} else {
-			b.WriteString(encodeValue(p.Value))
-		}
+		b.WriteString(value)
 	}
-	return b.String()
+	return b.String(), nil
+}
+
+// RawSafe validates a value that must be inserted into a URL without
+// encoding, and returns it unchanged.
+//
+// It rejects the characters that would let a value escape its own field:
+// '&' starts another query parameter, '?' starts the query string, '#'
+// starts the fragment, and whitespace (including CR and LF) either breaks
+// the URL or, in a mailto: URL, enables header injection.
+//
+// Legitimate values for the raw fields this library uses — email
+// addresses, comma-separated recipient lists, and Teams bot IDs of the
+// form "28:<guid>" — never contain these characters.
+func RawSafe(value string) (string, error) {
+	if strings.ContainsAny(value, "&?#\r\n\t ") {
+		return "", fmt.Errorf("value contains a URL-structural or whitespace character: %q", value)
+	}
+	return value, nil
 }
 
 // JoinPath joins a base URL and one or more path segments, inserting a
@@ -90,8 +120,7 @@ func JoinPath(base string, segments ...string) string {
 // parameter separator or split into multiple segments. It also uses %20
 // (not '+') for spaces, matching query encoding conventions.
 func PathSegment(s string) string {
-	encoded := url.QueryEscape(s)
-	return strings.ReplaceAll(encoded, "+", "%20")
+	return encodeValue(s)
 }
 
 // encodeKey URL-encodes a query key while preserving literal '[' and ']'.

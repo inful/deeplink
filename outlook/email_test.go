@@ -68,6 +68,22 @@ func TestEmail(t *testing.T) {
 			params:  EmailParams{To: []string{""}, CC: []string{""}, BCC: []string{""}},
 			wantErr: true,
 		},
+		{
+			name: "surrounding whitespace is trimmed from recipients",
+			params: EmailParams{
+				To: []string{"  a@x.com  "},
+			},
+			want: "mailto:a@x.com",
+		},
+		{
+			name: "surrounding whitespace is trimmed from cc and bcc",
+			params: EmailParams{
+				To:  []string{"a@x.com"},
+				CC:  []string{"  c@x.com  "},
+				BCC: []string{" d@x.com "},
+			},
+			want: "mailto:a@x.com?cc=c@x.com&bcc=d@x.com",
+		},
 	}
 
 	for _, tt := range tests {
@@ -81,6 +97,49 @@ func TestEmail(t *testing.T) {
 			}
 			if got != tt.want {
 				t.Errorf("Email() =\n  %q\nwant:\n  %q", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestEmailRejectsRecipientsThatCouldEscapeTheirField(t *testing.T) {
+	// The `to` field sits in the mailto: authority and cc/bcc are
+	// comma-separated lists, so a value containing '&', '?', '#' or
+	// whitespace would let it add parameters or headers of its own.
+	tests := []struct {
+		name   string
+		params EmailParams
+	}{
+		{
+			name:   "to injects a second query string",
+			params: EmailParams{To: []string{"a@x.com?bcc=attacker@evil.com"}},
+		},
+		{
+			name:   "to injects a CRLF header",
+			params: EmailParams{To: []string{"a@x.com\r\nBcc: attacker@evil.com"}},
+		},
+		{
+			name:   "to contains whitespace",
+			params: EmailParams{To: []string{"a@x.com b@x.com"}},
+		},
+		{
+			name:   "cc injects another parameter",
+			params: EmailParams{To: []string{"a@x.com"}, CC: []string{"c@x.com&bcc=attacker@evil.com"}},
+		},
+		{
+			name:   "bcc injects another parameter",
+			params: EmailParams{To: []string{"a@x.com"}, BCC: []string{"d@x.com&subject=hijacked"}},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := Email(tt.params)
+			if err == nil {
+				t.Fatalf("Email() accepted an unsafe recipient, got %q", got)
+			}
+			if got != "" {
+				t.Errorf("Email() returned %q alongside an error, want empty", got)
 			}
 		})
 	}

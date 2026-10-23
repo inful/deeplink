@@ -9,6 +9,7 @@ package gitlab
 
 import (
 	"errors"
+	"fmt"
 	"strconv"
 	"strings"
 
@@ -81,6 +82,12 @@ func Issue(p IssueParams) (string, error) {
 	if strings.TrimSpace(p.BaseURL) == "" {
 		return "", errors.New("gitlab.Issue: BaseURL is required")
 	}
+	switch p.IssueType {
+	case "", IssueTypeIssue, IssueTypeIncident:
+	default:
+		return "", fmt.Errorf("gitlab.Issue: invalid IssueType %q (want %q or %q)",
+			p.IssueType, IssueTypeIssue, IssueTypeIncident)
+	}
 
 	base := q.JoinPath(p.BaseURL, "/-/work_items/new")
 
@@ -114,7 +121,10 @@ func Issue(p IssueParams) (string, error) {
 		})
 	}
 
-	qs := q.Encode(pairs)
+	qs, err := q.Encode(pairs)
+	if err != nil {
+		return "", fmt.Errorf("gitlab.Issue: %w", err)
+	}
 	if qs == "" {
 		return base, nil
 	}

@@ -1,6 +1,9 @@
 package q
 
-import "testing"
+import (
+	"strings"
+	"testing"
+)
 
 func TestEncode(t *testing.T) {
 	tests := []struct {
@@ -93,9 +96,74 @@ func TestEncode(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := Encode(tt.pairs)
+			got, err := Encode(tt.pairs)
+			if err != nil {
+				t.Fatalf("Encode() unexpected error: %v", err)
+			}
 			if got != tt.want {
 				t.Errorf("Encode() =\n  %q\nwant:\n  %q", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestEncodeRejectsUnsafeRawValues(t *testing.T) {
+	// A raw value that could escape its own field must be an error, not
+	// a silently malformed URL.
+	unsafe := []string{
+		"a@x.com&bcc=attacker@evil.com",
+		"a@x.com?bcc=attacker@evil.com",
+		"a@x.com#fragment",
+		"a@x.com\r\nBcc: attacker@evil.com",
+		"a@x.com bob@x.com",
+	}
+	for _, v := range unsafe {
+		t.Run(v, func(t *testing.T) {
+			got, err := Encode([]Pair{{Key: "users", Value: v, Raw: true}})
+			if err == nil {
+				t.Fatalf("Encode() accepted unsafe raw value, got %q", got)
+			}
+			if !strings.Contains(err.Error(), "users") {
+				t.Errorf("error %q should name the offending key", err)
+			}
+			if got != "" {
+				t.Errorf("Encode() returned %q alongside an error, want empty", got)
+			}
+		})
+	}
+}
+
+func TestRawSafe(t *testing.T) {
+	safe := []string{
+		"a@x.com",
+		"a@x.com,b@x.com",
+		"28:47345678-2134-6534-9143-65146789012",
+		"joe@contoso.com,bob@contoso.com",
+	}
+	for _, v := range safe {
+		t.Run("safe/"+v, func(t *testing.T) {
+			got, err := RawSafe(v)
+			if err != nil {
+				t.Fatalf("RawSafe(%q) unexpected error: %v", v, err)
+			}
+			if got != v {
+				t.Errorf("RawSafe(%q) = %q, want it unchanged", v, got)
+			}
+		})
+	}
+
+	unsafe := []string{
+		"a&b",
+		"a?b",
+		"a#b",
+		"a\r\nb",
+		"a b",
+		"a\tb",
+	}
+	for _, v := range unsafe {
+		t.Run("unsafe/"+v, func(t *testing.T) {
+			if _, err := RawSafe(v); err == nil {
+				t.Errorf("RawSafe(%q) accepted an unsafe value", v)
 			}
 		})
 	}

@@ -60,6 +60,13 @@ func TestChannel(t *testing.T) {
 			want: "https://teams.microsoft.com/l/channel/19%3Amin%40thread.tacv2/Min",
 		},
 		{
+			name: "empty channel name leaves no trailing slash",
+			params: ChannelParams{
+				ChannelID: "19:min@thread.tacv2",
+			},
+			want: "https://teams.microsoft.com/l/channel/19%3Amin%40thread.tacv2",
+		},
+		{
 			name:    "missing channelId is an error",
 			params:  ChannelParams{ChannelName: "Foo"},
 			wantErr: true,

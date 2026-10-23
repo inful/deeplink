@@ -12,6 +12,7 @@ package teams
 
 import (
 	"errors"
+	"fmt"
 	"strings"
 
 	"github.com/inful/deeplink/internal/q"
@@ -54,11 +55,11 @@ type ChatParams struct {
 //	    Message: "Quick question about the rollout",
 //	})
 func NewChat(p ChatParams) (string, error) {
-	// Strip empty entries; require at least one real user.
+	// Drop empty entries; require at least one real user.
 	users := make([]string, 0, len(p.Users))
 	for _, u := range p.Users {
-		if strings.TrimSpace(u) != "" {
-			users = append(users, u)
+		if trimmed := strings.TrimSpace(u); trimmed != "" {
+			users = append(users, trimmed)
 		}
 	}
 	if len(users) == 0 {
@@ -70,12 +71,16 @@ func NewChat(p ChatParams) (string, error) {
 		{Key: "tenantId", Value: p.TenantID},
 		// Teams expects the users value to be a literal comma-separated
 		// list (per Microsoft's documentation), not a single value with
-		// "%2C" between the addresses. Use Raw to suppress encoding.
+		// "%2C" between the addresses. Use Raw to suppress encoding;
+		// q.Encode still rejects values that could escape this field.
 		{Key: "users", Value: strings.Join(users, ","), Raw: true},
 		{Key: "topicName", Value: p.TopicName},
 		{Key: "message", Value: p.Message},
 	}
-	qs := q.Encode(pairs)
+	qs, err := q.Encode(pairs)
+	if err != nil {
+		return "", fmt.Errorf("teams.NewChat: %w", err)
+	}
 	if qs == "" {
 		return base, nil
 	}

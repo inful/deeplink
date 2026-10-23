@@ -2,6 +2,7 @@ package teams
 
 import (
 	"errors"
+	"fmt"
 	"strings"
 
 	"github.com/inful/deeplink/internal/q"
@@ -58,9 +59,8 @@ func Channel(p ChannelParams) (string, error) {
 		return "", errors.New("teams.Channel: ChannelID is required")
 	}
 
-	base := "https://teams.microsoft.com/l/channel/" +
-		q.PathSegment(p.ChannelID) + "/" +
-		q.PathSegment(p.ChannelName)
+	base := q.JoinPath("https://teams.microsoft.com/l/channel",
+		q.PathSegment(p.ChannelID), q.PathSegment(p.ChannelName))
 
 	pairs := []q.Pair{
 		{Key: "groupId", Value: p.GroupID},
@@ -72,7 +72,10 @@ func Channel(p ChannelParams) (string, error) {
 	if p.Shared {
 		pairs = append(pairs, q.Pair{Key: "allowXTenantAccess", Value: "true"})
 	}
-	qs := q.Encode(pairs)
+	qs, err := q.Encode(pairs)
+	if err != nil {
+		return "", fmt.Errorf("teams.Channel: %w", err)
+	}
 	if qs == "" {
 		return base, nil
 	}
