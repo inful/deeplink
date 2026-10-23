@@ -86,6 +86,36 @@ jobs:
           token: ${{ secrets.CODECOV_TOKEN }}
 
   # ---------------------------------------------------------------------------
+  # shortcodes: render the Hugo shortcodes and check them against the Go
+  # library. Needs Hugo, which the GitHub runner images do not provide, so it
+  # is installed here rather than relying on the test being skipped.
+  # ---------------------------------------------------------------------------
+  shortcodes:
+    name: shortcodes (hugo)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.25"
+          cache: true
+
+      - name: Install Hugo
+        run: |
+          HUGO_VERSION=0.168.0
+          HUGO_SHA256=fada83ad56bb27ed4cb7dd81590303bdac16140f944ac4e66fc248117e2d5594
+          curl -sSL -o /tmp/hugo.tar.gz \
+            "https://github.com/gohugoio/hugo/releases/download/v${HUGO_VERSION}/hugo_${HUGO_VERSION}_linux-amd64.tar.gz"
+          echo "${HUGO_SHA256}  /tmp/hugo.tar.gz" | sha256sum --check --strict
+          tar -xzf /tmp/hugo.tar.gz -C /usr/local/bin hugo
+          hugo version
+
+      - name: Render the shortcodes and compare them with the Go library
+        run: go test -race -count=1 -v ./shortcodes/
+
+  # ---------------------------------------------------------------------------
   # build: ensure the module builds cleanly on every platform
   # ---------------------------------------------------------------------------
   build:
