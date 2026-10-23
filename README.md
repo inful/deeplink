@@ -119,27 +119,38 @@ for _, name := range shortcodes.Names() {
 }
 ```
 
-### A note on URL encoding
+### URL encoding
 
-The Go library and the shortcodes are independent implementations and
-do not produce byte-identical URLs:
+The Go library and the shortcodes produce **byte-identical URLs**. The
+shortcode templates were written to match the Go output exactly:
 
-- The **Go library** uses `%20` for spaces (matching the format in the
-  vendor documentation — GitLab, Microsoft — which always shows `%20`).
-- The **Hugo shortcodes** use Hugo's `querify` function, which uses `+`
-  (form encoding) for spaces.
+- Spaces are `%20`, matching the format the vendor documentation uses.
+- Namespaced keys keep their brackets — `issue[title]`, not
+  `issue%5Btitle%5D`.
+- Empty values are omitted entirely.
+- Values written literally (the Teams `users` list, `mailto:` recipients)
+  keep their commas.
 
-Both are valid URLs and all three vendors accept both. The difference
-is purely cosmetic. If you need exact reproducibility, call the Go
-library from your build pipeline and pass the resulting URL into Hugo
-as page metadata.
+A test in `shortcodes/render_test.go` renders every shortcode with Hugo
+and compares the result against the Go function it mirrors, so the two
+cannot drift apart silently. It is skipped when Hugo is not installed.
 
 ### A note on parallel maintenance
 
 Each shortcode file is a hand-written Hugo template that mirrors the
 logic in the corresponding Go function. If you change one, change the
-other. The doc comments at the top of each shortcode state which Go
-function it mirrors.
+other — the rendering test will tell you if you forget. The doc
+comments at the top of each shortcode state which Go function it
+mirrors.
+
+### A note on untrusted input
+
+Some parameters are written into the URL without encoding, because the
+destination system expects them literally: the Teams `users` list and
+the `mailto:` recipient lists. A value containing `&`, `?`, `#` or
+whitespace could otherwise add parameters of its own — for example
+turning one recipient into a blind copy. The Go library rejects such
+values, and so do the shortcodes.
 
 ## Architecture
 
@@ -147,6 +158,7 @@ function it mirrors.
 deeplink/                  # top-level: combined Funcmap()
 ├── deeplink.go
 ├── internal/q/             # shared query/path encoding helpers
+├── internal/tmpl/          # shared template-value coercion helpers
 ├── gitlab/                 # GitLab sub-package (self-contained)
 │   ├── issue.go
 │   ├── mergerequest.go
@@ -164,13 +176,17 @@ deeplink/                  # top-level: combined Funcmap()
 │   └── *_test.go
 └── shortcodes/             # embedded Hugo shortcode HTML
     ├── embed.go            # go:embed *.html
-    ├── gitlab-issue.html
-    ├── gitlab-mergerequest.html
-    ├── teams-new-chat.html
-    ├── teams-channel.html
-    ├── outlook-event.html
-    └── outlook-email.html
+    ├── deeplink-gitlab-issue.html
+    ├── deeplink-gitlab-mergerequest.html
+    ├── deeplink-teams-new-chat.html
+    ├── deeplink-teams-channel.html
+    ├── deeplink-outlook-event.html
+    └── deeplink-outlook-email.html
 ```
+
+Shortcode file names match the shortcode names exactly: Hugo looks up
+`{{< deeplink-gitlab-issue >}}` in `deeplink-gitlab-issue.html`, so a
+file named anything else would silently never be found.
 
 ### Adding a new system
 
@@ -181,13 +197,13 @@ deeplink/                  # top-level: combined Funcmap()
    returns the namespaced FuncMap for your functions.
 3. Add one line to the top-level `Funcmap()` in `deeplink.go` to
    include your FuncMap in the combined result.
-4. Add one shortcode HTML file in `shortcodes/` that mirrors the Go
-   logic. The `//go:embed` directive will pick it up automatically.
+4. Add one shortcode HTML file in `shortcodes/`, named after the
+   shortcode it defines, that mirrors the Go logic. The `//go:embed`
+   directive will pick it up automatically.
 
-That's it — no other plumbing needed. The existing tests in
-`deeplink_test.go` (`TestFuncmapCombinesAllSubPackages` and
-`TestNoFuncNameCollisions`) will verify your function is wired in and
-that you haven't shadowed an existing name.
+That's it — no other plumbing needed. `TestFuncmapExposesExactlyTheExpectedFunctions`
+in `deeplink_test.go` will tell you to add your function to the expected
+list, and `Funcmap()` panics if two sub-packages claim the same name.
 
 ## URL reference
 
