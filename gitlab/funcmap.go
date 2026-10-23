@@ -1,8 +1,9 @@
 package gitlab
 
 import (
-	"strconv"
 	"text/template"
+
+	"github.com/inful/deeplink/internal/tmpl"
 )
 
 // FuncMap returns a template.FuncMap containing every GitLab deep-link
@@ -41,69 +42,27 @@ func FuncMap() template.FuncMap {
 // exactly).
 func issueFromMap(m map[string]any) (string, error) {
 	return Issue(IssueParams{
-		BaseURL:             mapString(m, "BaseURL"),
-		Title:               mapString(m, "Title"),
-		Description:         mapString(m, "Description"),
-		IssueType:           IssueType(mapString(m, "IssueType")),
-		Confidential:        mapBool(m, "Confidential"),
-		Template:            mapString(m, "Template"),
-		DescriptionTemplate: mapString(m, "DescriptionTemplate"),
-		AddRelatedIssue:     mapInt(m, "AddRelatedIssue"),
+		BaseURL:             tmpl.String(m, "BaseURL"),
+		Title:               tmpl.String(m, "Title"),
+		Description:         tmpl.String(m, "Description"),
+		IssueType:           IssueType(tmpl.String(m, "IssueType")),
+		Confidential:        tmpl.Bool(m, "Confidential"),
+		Template:            tmpl.String(m, "Template"),
+		DescriptionTemplate: tmpl.String(m, "DescriptionTemplate"),
+		AddRelatedIssue:     tmpl.Int(m, "AddRelatedIssue"),
 	})
 }
 
 // mergeRequestFromMap is the template-friendly adapter for MergeRequest.
 func mergeRequestFromMap(m map[string]any) (string, error) {
 	return MergeRequest(MergeRequestParams{
-		BaseURL:            mapString(m, "BaseURL"),
-		Title:              mapString(m, "Title"),
-		Description:        mapString(m, "Description"),
-		SourceBranch:       mapString(m, "SourceBranch"),
-		TargetBranch:       mapString(m, "TargetBranch"),
-		RemoveSourceBranch: mapBool(m, "RemoveSourceBranch"),
-		Squash:             mapBool(m, "Squash"),
-		NavSource:          mapString(m, "NavSource"),
+		BaseURL:            tmpl.String(m, "BaseURL"),
+		Title:              tmpl.String(m, "Title"),
+		Description:        tmpl.String(m, "Description"),
+		SourceBranch:       tmpl.String(m, "SourceBranch"),
+		TargetBranch:       tmpl.String(m, "TargetBranch"),
+		RemoveSourceBranch: tmpl.Bool(m, "RemoveSourceBranch"),
+		Squash:             tmpl.Bool(m, "Squash"),
+		NavSource:          tmpl.String(m, "NavSource"),
 	})
-}
-
-func mapString(m map[string]any, key string) string {
-	if v, ok := m[key]; ok {
-		if s, ok := v.(string); ok {
-			return s
-		}
-	}
-	return ""
-}
-
-func mapBool(m map[string]any, key string) bool {
-	if v, ok := m[key]; ok {
-		switch b := v.(type) {
-		case bool:
-			return b
-		case string:
-			// tolerate string "true"/"false" coming from YAML/JSON/Hugo
-			return b == "true" || b == "1" || b == "yes"
-		}
-	}
-	return false
-}
-
-func mapInt(m map[string]any, key string) int {
-	if v, ok := m[key]; ok {
-		switch n := v.(type) {
-		case int:
-			return n
-		case int64:
-			return int(n)
-		case float64:
-			return int(n)
-		case string:
-			// tolerate numeric strings from YAML/JSON; Atoi failure
-			// (non-numeric input) returns 0, which is the documented
-			// "absent" sentinel for this helper.
-			i, _ := strconv.Atoi(n) //nolint:errcheck // Atoi failure (non-numeric input) returns 0, the documented "absent" sentinel
-			return i
-		}
-	}
-	return 0
 }

@@ -2,6 +2,7 @@ package gitlab
 
 import (
 	"errors"
+	"fmt"
 	"strings"
 
 	"github.com/inful/deeplink/internal/q"
@@ -87,7 +88,10 @@ func MergeRequest(p MergeRequestParams) (string, error) {
 		})
 	}
 
-	qs := q.Encode(pairs)
+	qs, err := q.Encode(pairs)
+	if err != nil {
+		return "", fmt.Errorf("gitlab.MergeRequest: %w", err)
+	}
 	if qs == "" {
 		return base, nil
 	}
