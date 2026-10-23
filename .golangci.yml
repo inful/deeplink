@@ -69,19 +69,6 @@ linters:
       check-blank: true        # assignments to _ are still checked
       check-type-assertions: true
 
-  exclusions:
-    # Generated files and test data are exempt.
-    paths:
-      - internal/q/testdata
-    rules:
-      - path: _test\.go
-        text: "unused-parameter"        # common in table-driven tests
-      - path: funcmap_test\.go
-        text: "unused-parameter"        # ditto
-      # Allow `// Some comment` without a trailing period in short doc lines.
-      - linters: [revive]
-        text: "should be of the form"
-
 formatters:
   enable:
     - gofmt
@@ -91,7 +78,3 @@ formatters:
       # Group our own packages under their own group.
       local-prefixes:
         - github.com/inful/deeplink
-
-  exclusions:
-    paths:
-      - internal/q/testdata
